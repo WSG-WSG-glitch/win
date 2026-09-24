@@ -21,9 +21,9 @@ Do not open `index.html` directly as a `file://` URL. Eaglecraft's bundled worke
 
 The dashboard connects to `ws://localhost:8080`. The server sends an initial test message, and any message received from a WebSocket client is broadcast to all connected dashboards.
 
-The copied Eaglecraft client uses three allowlisted `wss://` relays for multiplayer. The local server now provides a raw WebSocket proxy for those relays, which can help when a school network blocks direct connections to the relay hostnames. In Eaglecraft's relay screen, the green check beside a relay marks the selected **primary** relay; the connection result is shown separately on the right. A red cross there means the Eaglecraft relay-protocol connection timed out or failed.
+The Firebase-hosted Eaglercraft client connects directly to relay and server WebSocket addresses. The Codespaces-hosted client routes those WebSockets through its local `/relay` proxy. In Eaglecraft's relay screen, the green check beside a relay marks the selected **primary** relay; the connection result is shown separately on the right. A red cross there means the Eaglercraft relay-protocol connection timed out or failed.
 
-After updating this file, hard-refresh the page. If the relay screen still shows the original direct `wss://relay...` addresses, open the boot menu and choose the option to reset servers and relays, or clear this site's storage in the browser. Eaglecraft saves the old relay list locally and may otherwise ignore the new proxy addresses.
+After updating this file, hard-refresh the page. The launcher removes the old saved relay list from the proxy version once, while preserving worlds and added servers. If the relay screen still shows the Firebase `/relay?target=` address, open the boot menu and choose the option to reset servers and relays, or clear this site's storage in the browser.
 
 The local WebSocket endpoint is only a basic WebSocket test server, while `/relay` forwards Eaglecraft's binary frames to an allowlisted public relay. It is not itself an Eaglecraft relay and cannot replace the public relay service. A basic WebSocket handshake succeeding is not enough to prove that Eaglecraft can use a relay: the client must also complete Eaglecraft's relay protocol, which is why the browser's relay status is the authoritative result.
 
@@ -34,3 +34,7 @@ The launcher includes a **Download Eagler browser backup** button. Use it while 
 The backup may contain private world and profile data. Store it securely and do not commit it to GitHub. The relay proxy does not save this data.
 
 Stop the server with `Ctrl+C`.
+
+## Firebase Hosting and WebSockets
+
+The Eaglercraft page connects directly to the public relay hosts, so Firebase Hosting does not need to run `server.js`. The optional Node server provides a proxy only for networks that block direct relay connections.

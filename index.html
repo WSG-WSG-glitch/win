@@ -92,63 +92,55 @@
 		document.body.appendChild(button);
 	});
 
-	var relayProxyBase = (window.location.protocol === "https:" ? "wss://" : "ws://") + window.location.host + "/relay?target=";
-	var OriginalWebSocket = window.WebSocket;
-	window.__relayDebug = { raw: null, proxied: null };
-
-	function showRelayDebug(rawValue, proxiedValue) {
-		var debugNode = document.getElementById("relay-proxy-debug");
-		if (!debugNode) {
-			debugNode = document.createElement("div");
-			debugNode.id = "relay-proxy-debug";
-			debugNode.style.cssText = "position:fixed;left:12px;bottom:12px;max-width:92vw;z-index:2147483647;padding:10px 12px;border:1px solid rgba(255,255,255,.3);background:rgba(0,0,0,.72);color:#fff;font:12px/1.4 monospace;border-radius:6px;pointer-events:none;white-space:pre-wrap;opacity:1;transition:opacity 0.5s ease;";
-			document.body.appendChild(debugNode);
-		}
-		debugNode.innerHTML = "Raw server: " + (rawValue || "-") + "<br>Proxy target: " + (proxiedValue || "-");
-		debugNode.style.opacity = "1";
-		clearTimeout(debugNode._relayDebugFadeTimer);
-		debugNode._relayDebugFadeTimer = setTimeout(function() {
-			debugNode.style.opacity = "0";
-		}, 3000);
-	}
-
-	function normalizeTarget(target) {
-		if (!target || typeof target !== "string") return target;
-		var trimmed = target.trim();
-		if (!trimmed) return trimmed;
-		if (/^wss?:\/\//i.test(trimmed)) return trimmed;
-		if (/^\/\//.test(trimmed)) return (window.location.protocol === "https:" ? "wss:" : "ws:") + trimmed;
-		if (/^[^/:]+(:\d+)?(\/.*)?$/.test(trimmed)) return (window.location.protocol === "https:" ? "wss://" : "ws://") + trimmed;
-		return trimmed;
-	}
-
-	function ProxyWebSocket(target, protocols) {
-		var normalizedTarget = normalizeTarget(target);
-		if (normalizedTarget && !/^wss?:\/\/[^\s]+\/relay\?target=/i.test(normalizedTarget)) {
-			var proxiedTarget = relayProxyBase + encodeURIComponent(normalizedTarget);
-			window.__relayDebug.raw = normalizedTarget;
-			window.__relayDebug.proxied = proxiedTarget;
-			console.log("[relay-proxy] raw:", normalizedTarget, "=>", proxiedTarget);
-			showRelayDebug(normalizedTarget, proxiedTarget);
-			return new OriginalWebSocket(proxiedTarget, protocols);
-		}
-		window.__relayDebug.raw = normalizedTarget;
-		window.__relayDebug.proxied = normalizedTarget;
-		showRelayDebug(normalizedTarget, normalizedTarget);
-		return new OriginalWebSocket(normalizedTarget, protocols);
-	}
-
-	ProxyWebSocket.prototype = OriginalWebSocket.prototype;
-	for (var key of Object.getOwnPropertyNames(OriginalWebSocket)) {
-		if (!(key in ProxyWebSocket)) {
-			Object.defineProperty(ProxyWebSocket, key, Object.getOwnPropertyDescriptor(OriginalWebSocket, key));
-		}
-	}
-	window.WebSocket = ProxyWebSocket;
 })();
 
+(function() {
+	try {
+		var migrationKey = window.location.hostname.endsWith(".app.github.dev")
+			? "_proxyRelaysMigrationV2"
+			: "_directRelaysMigrationV3";
+		if (window.localStorage && !window.localStorage.getItem(migrationKey)) {
+			window.localStorage.removeItem("_eaglercraftX.r");
+			window.localStorage.setItem(migrationKey, "1");
+		}
+	} catch (error) {
+		console.warn("Unable to migrate saved relay settings", error);
+	}
+})();
+
+var isCodespacesHost = window.location.hostname.endsWith(".app.github.dev");
+var relayProxyBase = isCodespacesHost
+	? ((window.location.protocol === "https:" ? "wss://" : "ws:") + window.location.host + "/relay?target=")
+	: "";
+var OriginalWebSocket = window.WebSocket;
+
+function normalizeTarget(target) {
+	if (!target || typeof target !== "string") return target;
+	var trimmed = target.trim();
+	if (!trimmed) return trimmed;
+	if (/^wss?:\/\//i.test(trimmed)) return trimmed;
+	if (/^\/\//.test(trimmed)) return (window.location.protocol === "https:" ? "wss:" : "ws:") + trimmed;
+	if (/^[^/:]+(:\d+)?(\/.*)?$/.test(trimmed)) return (window.location.protocol === "https:" ? "wss://" : "ws://") + trimmed;
+	return trimmed;
+}
+
+function ProxyWebSocket(target, protocols) {
+	var normalizedTarget = normalizeTarget(target);
+	if (isCodespacesHost && normalizedTarget && !/^wss?:\/\/[^\s]+\/relay\?target=/i.test(normalizedTarget)) {
+		return new OriginalWebSocket(relayProxyBase + encodeURIComponent(normalizedTarget), protocols);
+	}
+	return new OriginalWebSocket(normalizedTarget, protocols);
+}
+
+ProxyWebSocket.prototype = OriginalWebSocket.prototype;
+for (var key of Object.getOwnPropertyNames(OriginalWebSocket)) {
+	if (!(key in ProxyWebSocket)) {
+		Object.defineProperty(ProxyWebSocket, key, Object.getOwnPropertyDescriptor(OriginalWebSocket, key));
+	}
+}
+window.WebSocket = ProxyWebSocket;
+
 var relayId = Math.floor(Math.random() * 3);
-var relayProxy = (window.location.protocol === "https:" ? "wss://" : "ws://") + window.location.host + "/relay?target=";
 
 // %%%%%%%%% launch options %%%%%%%%%%%%
 
@@ -157,9 +149,9 @@ window.eaglercraftXOptsHints = {
 	container: "game_frame",
 	worldsDB: "worlds",
 	relays: [
-		{ addr: relayProxy + encodeURIComponent("wss://relay.deev.is/"), comment: "lax1dude relay #1 (proxy)", primary: relayId === 0 },
-		{ addr: relayProxy + encodeURIComponent("wss://relay.lax1dude.net/"), comment: "lax1dude relay #2 (proxy)", primary: relayId === 1 },
-		{ addr: relayProxy + encodeURIComponent("wss://relay.shhnowisnottheti.me/"), comment: "ayunami relay #1 (proxy)", primary: relayId === 2 }
+		{ addr: isCodespacesHost ? relayProxyBase + encodeURIComponent("wss://relay.deev.is/") : "wss://relay.deev.is/", comment: isCodespacesHost ? "lax1dude relay #1 (Codespaces proxy)" : "lax1dude relay #1", primary: relayId === 0 },
+		{ addr: isCodespacesHost ? relayProxyBase + encodeURIComponent("wss://relay.lax1dude.net/") : "wss://relay.lax1dude.net/", comment: isCodespacesHost ? "lax1dude relay #2 (Codespaces proxy)" : "lax1dude relay #2", primary: relayId === 1 },
+		{ addr: isCodespacesHost ? relayProxyBase + encodeURIComponent("wss://relay.shhnowisnottheti.me/") : "wss://relay.shhnowisnottheti.me/", comment: isCodespacesHost ? "ayunami relay #1 (Codespaces proxy)" : "ayunami relay #1", primary: relayId === 2 }
 	],
 	checkRelaysForUpdates: true
 };

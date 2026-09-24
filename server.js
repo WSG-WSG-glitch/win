@@ -5,6 +5,12 @@ const { WebSocketServer, WebSocket } = require('ws');
 
 const port = Number(process.env.PORT) || 8080;
 const indexPath = path.join(__dirname, 'index.html');
+const allowedRelayHosts = new Set([
+  'relay.deev.is',
+  'relay.lax1dude.net',
+  'relay.shhnowisnottheti.me',
+  'eagler-0l52.onrender.com'
+]);
 
 const httpServer = http.createServer((request, response) => {
   if (request.url === '/health') {
@@ -39,7 +45,7 @@ function isAllowedTarget(target) {
 
   try {
     const parsed = new URL(target);
-    return (parsed.protocol === 'ws:' || parsed.protocol === 'wss:');
+    return (parsed.protocol === 'ws:' || parsed.protocol === 'wss:') && allowedRelayHosts.has(parsed.hostname);
   } catch (error) {
     return false;
   }
